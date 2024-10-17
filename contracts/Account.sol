@@ -2,17 +2,29 @@
 pragma solidity 0.8.27;
 
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 import {IAccount} from "./interfaces/IAccount.sol";
+import {IUniswapV3SwapCallback} from "./interfaces/uniswap/callback/IUniswapV3SwapCallback.sol";
+import {IUniswapV3Pool} from "./interfaces/uniswap/IUniswapV3Pool.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-contract Account is IAccount, Initializable, OwnableUpgradeable {
+contract Account is IAccount, Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable, IUniswapV3SwapCallback {
     address public factory;
     address public user;
     address public baseToken;
     address public quoteToken;
     address public uniPool;
     address public aavePool;
+
+    uint public baseBalance;
+    uint public quoteBalance;
+
+    bool public ispositionOpen;
+
+    error PositionExists();
+    error PositionNonexists();
 
     constructor() {
         _disableInitializers();
@@ -26,14 +38,17 @@ contract Account is IAccount, Initializable, OwnableUpgradeable {
         uniPool = _uniPool;
         aavePool = _aavePool;
         __Ownable_init(_user);
+        __ReentrancyGuard_init();
     }
 
-    function deposit() external onlyOwner() {
-
+    function deposit(bool isBase, uint amount) external onlyOwner() nonReentrant() {
+        address token = isBase ? baseToken:quoteToken;
+        IERC20(token).transferFrom(msg.sender, address(this), amount);
     }
 
-    function withdraw() external onlyOwner() {
-
+    function withdraw(bool isBase, uint amount) external onlyOwner() nonReentrant() {
+        address token = isBase ? baseToken:quoteToken;
+        IERC20(token).transfer(msg.sender, amount);
     }
     // keep a few base token as margin, then mortgage in quote token, and borrow more base token
     // ex. WETH/USDC pair, long WETH,
@@ -42,7 +57,8 @@ contract Account is IAccount, Initializable, OwnableUpgradeable {
     // use all WETH as margin to borrow USDC(on aave)
     // repay minimum USDC to Uniswap
     // Finally, we have more WETH in collateral.
-    function openLong() external onlyOwner() {
+    function openLong() external onlyOwner() nonReentrant() {
+        require(!isPositionOpen, PositionExists);
 
     }
 
@@ -53,23 +69,19 @@ contract Account is IAccount, Initializable, OwnableUpgradeable {
     // use all USDC as margin to borrow WETH(on aave)
     // repay minimum WETH to Uniswap
     // Finally, we have more USDC in collateral.
-    function openShort() external onlyOwner() {
-
+    function openShort() external onlyOwner() nonReentrant() {
+        require(!isPositionOpen, PositionExists);
     }
 
-    function closeLong() external onlyOwner() {
-
+    function closeLong() external onlyOwner() nonReentrant() {
+        require(ispositionOpen, PositionNonexists);
     }
 
-    function closeShort() external onlyOwner() {
-
+    function closeShort() external onlyOwner() nonReentrant() {
+        require(ispositionOpen, PositionNonexists);
     }
 
-    function quoteBalance() public {
-
-    }
-
-    function baseBalance() public {
+    function uniswapV3SwapCallback(int amount0Delta, int amount1Delta, bytes calldata data) external {
 
     }
 }
