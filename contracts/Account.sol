@@ -31,4 +31,45 @@ contract Account is IAccount, Initializable, OwnableUpgradeable {
     function deposit() external onlyOwner() {
 
     }
+
+    function withdraw() external onlyOwner() {
+
+    }
+    // keep a few base token as margin, then mortgage in quote token, and borrow more base token
+    // ex. WETH/USDC pair, long WETH,
+    // keep a few WETH as margin,
+    // flashswap USDC -> WETH(on Uniswap),
+    // use all WETH as margin to borrow USDC(on aave)
+    // repay minimum USDC to Uniswap
+    // Finally, we have more WETH in collateral.
+    function openLong() external onlyOwner() {
+
+    }
+
+    // keep a few quote token as margin, then mortage in base token, and borrow more quote token
+    // ex. WETH/USDC pair, short WETH,
+    // keep a few USDC as margin,
+    // flashswap WETH -> USDC(on Uniswap),
+    // use all USDC as margin to borrow WETH(on aave)
+    // repay minimum WETH to Uniswap
+    // Finally, we have more USDC in collateral.
+    function openShort() external onlyOwner() {
+
+    }
+
+    function closeLong() external onlyOwner() {
+
+    }
+
+    function closeShort() external onlyOwner() {
+
+    }
+
+    function quoteBalance() public {
+
+    }
+
+    function baseBalance() public {
+
+    }
 }
