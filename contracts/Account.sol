@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.27;
 
-import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
@@ -10,7 +9,7 @@ import {IUniswapV3SwapCallback} from "./interfaces/uniswap/callback/IUniswapV3Sw
 import {IUniswapV3Pool} from "./interfaces/uniswap/IUniswapV3Pool.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-contract Account is IAccount, Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable, IUniswapV3SwapCallback {
+contract Account is IAccount, Initializable, ReentrancyGuardUpgradeable, IUniswapV3SwapCallback {
     address public factory;
     address public user;
     address public baseToken;
@@ -26,6 +25,11 @@ contract Account is IAccount, Initializable, OwnableUpgradeable, ReentrancyGuard
     error PositionExists();
     error PositionNonexists();
 
+    modifier onlyUser() {
+        require(msg.sender == user, NotUser());
+        _;
+    }
+
     constructor() {
         _disableInitializers();
     }
@@ -37,19 +41,25 @@ contract Account is IAccount, Initializable, OwnableUpgradeable, ReentrancyGuard
         quoteToken = _quoteToken;
         uniPool = _uniPool;
         aavePool = _aavePool;
-        __Ownable_init(_user);
         __ReentrancyGuard_init();
     }
 
-    function deposit(bool isBase, uint amount) external onlyOwner() nonReentrant() {
-        address token = isBase ? baseToken:quoteToken;
-        IERC20(token).transferFrom(msg.sender, address(this), amount);
+    function deposit(bool isBase, uint amount) external onlyUser() nonReentrant() {
+        if (isBase) {
+            IERC20(baseToken).transferFrom(msg.sender, address(this), amount);
+            baseBalance += amount;
+        } else {
+            IER20(quoteToken).transferFrom(msg.sender, address(this), amount);
+            quoteBalance += amount;
+        }
     }
 
-    function withdraw(bool isBase, uint amount) external onlyOwner() nonReentrant() {
-        address token = isBase ? baseToken:quoteToken;
-        IERC20(token).transfer(msg.sender, amount);
+    function withdraw(bool isBase, uint amount) external onlyUser() nonReentrant() {
+        if (isBase) {
+            IERC20(baseToken).transfer(msg.sender, )
+        }
     }
+
     // keep a few base token as margin, then mortgage in quote token, and borrow more base token
     // ex. WETH/USDC pair, long WETH,
     // keep a few WETH as margin,
@@ -57,8 +67,8 @@ contract Account is IAccount, Initializable, OwnableUpgradeable, ReentrancyGuard
     // use all WETH as margin to borrow USDC(on aave)
     // repay minimum USDC to Uniswap
     // Finally, we have more WETH in collateral.
-    function openLong() external onlyOwner() nonReentrant() {
-        require(!isPositionOpen, PositionExists);
+    function openLong() external onlyUser() nonReentrant() {
+        require(!isPositionOpen, PositionExists());
 
     }
 
@@ -69,16 +79,16 @@ contract Account is IAccount, Initializable, OwnableUpgradeable, ReentrancyGuard
     // use all USDC as margin to borrow WETH(on aave)
     // repay minimum WETH to Uniswap
     // Finally, we have more USDC in collateral.
-    function openShort() external onlyOwner() nonReentrant() {
-        require(!isPositionOpen, PositionExists);
+    function openShort() external onlyUser() nonReentrant() {
+        require(!isPositionOpen, PositionExists());
     }
 
-    function closeLong() external onlyOwner() nonReentrant() {
-        require(ispositionOpen, PositionNonexists);
+    function closeLong() external onlyUser() nonReentrant() {
+        require(ispositionOpen, PositionNonexists());
     }
 
-    function closeShort() external onlyOwner() nonReentrant() {
-        require(ispositionOpen, PositionNonexists);
+    function closeShort() external onlyUser() nonReentrant() {
+        require(ispositionOpen, PositionNonexists());
     }
 
     function uniswapV3SwapCallback(int amount0Delta, int amount1Delta, bytes calldata data) external {
