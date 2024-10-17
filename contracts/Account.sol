@@ -21,9 +21,13 @@ contract Account is IAccount, Initializable, ReentrancyGuardUpgradeable, IUniswa
     uint public quoteBalance;
 
     bool public ispositionOpen;
+    bool private isBaseZero;// identify during swap on Uniswap
 
     error PositionExists();
     error PositionNonexists();
+    error NotEnoughMargin(bool isBase);
+
+    enum Action {OPENLONG, OPENSHORT, CLOSELONG, CLOSESHORT};
 
     modifier onlyUser() {
         require(msg.sender == user, NotUser());
@@ -41,6 +45,8 @@ contract Account is IAccount, Initializable, ReentrancyGuardUpgradeable, IUniswa
         quoteToken = _quoteToken;
         uniPool = _uniPool;
         aavePool = _aavePool;
+
+        isBaseZero = baseToken < quoteToken ? true : false;
         __ReentrancyGuard_init();
     }
 
@@ -55,9 +61,8 @@ contract Account is IAccount, Initializable, ReentrancyGuardUpgradeable, IUniswa
     }
 
     function withdraw(bool isBase, uint amount) external onlyUser() nonReentrant() {
-        if (isBase) {
-            IERC20(baseToken).transfer(msg.sender, )
-        }
+        if (isBase) IERC20(baseToken).transfer(msg.sender, amount);
+        else IERC20(quoteToken).transfer(msg.sender, amount);
     }
 
     // keep a few base token as margin, then mortgage in quote token, and borrow more base token
@@ -69,7 +74,14 @@ contract Account is IAccount, Initializable, ReentrancyGuardUpgradeable, IUniswa
     // Finally, we have more WETH in collateral.
     function openLong() external onlyUser() nonReentrant() {
         require(!isPositionOpen, PositionExists());
-
+        require(baseBalance > 0, NotEnoughMargin(true));
+        IUniswapV3Pool(uniPool).swap(
+            address(this), // recipient
+            isBaseZero ? false : true, // zeroForOne
+            -baseBalance, // amountSpecified
+            0, // sqrtPriceLimitX96
+            abi.encode(Action.OPENLONG)// callback data
+            );
     }
 
     // keep a few quote token as margin, then mortage in base token, and borrow more quote token
@@ -92,6 +104,11 @@ contract Account is IAccount, Initializable, ReentrancyGuardUpgradeable, IUniswa
     }
 
     function uniswapV3SwapCallback(int amount0Delta, int amount1Delta, bytes calldata data) external {
+        Action action = abi.decode(data, (Action));
+        if (action == Action.OpenLong) {
+            uint baseOutAmount = isBaseZero ? -amount0 : -amount1;
+            uint quoteInAmount = isBaseZero ? amount1: amount0;
 
+        }
     }
 }
