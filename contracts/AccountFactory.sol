@@ -2,12 +2,12 @@
 pragma solidity 0.8.27;
 
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts/utils/ReentrancyGuardUpgradeable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {BUProxy} from "./proxy/BUProxy.sol";
-import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {IAccount} from "./interfaces/IAccount.sol";
 
-contract AccountFactory is Initializable, AccessControlUpgradeable, ReentrancyGuard {
+contract AccountFactory is Initializable, AccessControlUpgradeable, ReentrancyGuardUpgradeable {
 
     mapping(address user => address account) public accounts;
 
