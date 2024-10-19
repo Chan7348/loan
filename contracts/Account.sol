@@ -20,14 +20,15 @@ contract Account is IAccount, Initializable, ReentrancyGuardUpgradeable, IUniswa
     uint public baseBalance;
     uint public quoteBalance;
 
-    bool public ispositionOpen;
+    bool public isPositionOpen;
     bool private isBaseZero;// identify during swap on Uniswap
 
     error PositionExists();
     error PositionNonexists();
     error NotEnoughMargin(bool isBase);
+    error NotUser();
 
-    enum Action {OPENLONG, OPENSHORT, CLOSELONG, CLOSESHORT};
+    enum Action {OPENLONG, OPENSHORT, CLOSELONG, CLOSESHORT}
 
     modifier onlyUser() {
         require(msg.sender == user, NotUser());
@@ -55,7 +56,7 @@ contract Account is IAccount, Initializable, ReentrancyGuardUpgradeable, IUniswa
             IERC20(baseToken).transferFrom(msg.sender, address(this), amount);
             baseBalance += amount;
         } else {
-            IER20(quoteToken).transferFrom(msg.sender, address(this), amount);
+            IERC20(quoteToken).transferFrom(msg.sender, address(this), amount);
             quoteBalance += amount;
         }
     }
@@ -78,7 +79,7 @@ contract Account is IAccount, Initializable, ReentrancyGuardUpgradeable, IUniswa
         IUniswapV3Pool(uniPool).swap(
             address(this), // recipient
             isBaseZero ? false : true, // zeroForOne
-            -baseBalance, // amountSpecified
+            -int(baseBalance), // amountSpecified
             0, // sqrtPriceLimitX96
             abi.encode(Action.OPENLONG)// callback data
             );
@@ -96,18 +97,18 @@ contract Account is IAccount, Initializable, ReentrancyGuardUpgradeable, IUniswa
     }
 
     function closeLong() external onlyUser() nonReentrant() {
-        require(ispositionOpen, PositionNonexists());
+        require(isPositionOpen, PositionNonexists());
     }
 
     function closeShort() external onlyUser() nonReentrant() {
-        require(ispositionOpen, PositionNonexists());
+        require(isPositionOpen, PositionNonexists());
     }
 
     function uniswapV3SwapCallback(int amount0Delta, int amount1Delta, bytes calldata data) external {
         Action action = abi.decode(data, (Action));
-        if (action == Action.OpenLong) {
-            uint baseOutAmount = isBaseZero ? -amount0 : -amount1;
-            uint quoteInAmount = isBaseZero ? amount1: amount0;
+        if (action == Action.OPENLONG) {
+            uint baseOutAmount = uint(isBaseZero ? -amount0Delta : -amount1Delta);
+            uint quoteInAmount = uint(isBaseZero ? amount1Delta: amount0Delta);
 
         }
     }
