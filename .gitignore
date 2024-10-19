@@ -19,3 +19,5 @@ ignition/deployments/chain-31337
 # Foundry files
 /cache_forge
 /out
+
+/bin
