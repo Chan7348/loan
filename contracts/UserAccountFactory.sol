@@ -5,11 +5,10 @@ import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/acce
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {BUProxy} from "./proxy/BUProxy.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {IAccount} from "./interfaces/IAccount.sol";
+import {IUserAccount} from "./interfaces/IUserAccount.sol";
 
-contract AccountFactory is Initializable, AccessControlUpgradeable, ReentrancyGuardUpgradeable {
-
-    mapping(address user => address account) public accounts;
+contract UserAccountFactory is Initializable, AccessControlUpgradeable, ReentrancyGuardUpgradeable {
+    mapping(address user => address UserAccount) public UserAccounts;
 
     address public beacon;
     address public baseToken;
@@ -17,7 +16,7 @@ contract AccountFactory is Initializable, AccessControlUpgradeable, ReentrancyGu
     address public uniPool;
     address public aavePool;
 
-    error AccountExists(address user, address account);
+    error UserAccountExists(address user, address UserAccount);
 
     event Register(address indexed user);
 
@@ -25,19 +24,33 @@ contract AccountFactory is Initializable, AccessControlUpgradeable, ReentrancyGu
         _disableInitializers();
     }
 
-    function initialize(address _admin, address _beacon, address _baseToken, address _quoteToken) external initializer {
+    function initialize(
+        address _admin,
+        address _beacon,
+        address _baseToken,
+        address _quoteToken,
+        address _uniPool,
+        address _aavePool
+    ) external initializer {
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
         __ReentrancyGuard_init();
         beacon = _beacon;
         baseToken = _baseToken;
         quoteToken = _quoteToken;
+        uniPool = _uniPool;
+        aavePool = _aavePool;
     }
 
     function register() external {
         address user = msg.sender;
-        require(accounts[user] == address(0), AccountExists(user, accounts[user]));
-        bytes memory data = abi.encodeCall(IAccount.initialize, (address(this), user, baseToken, quoteToken, uniPool, aavePool));
-        accounts[user] = address(new BUProxy(beacon, data));
+        require(UserAccounts[user] == address(0), UserAccountExists(user, UserAccounts[user]));
+
+        UserAccounts[user] = address(
+            new BUProxy(
+                beacon,
+                abi.encodeCall(IUserAccount.initialize, (address(this), user, baseToken, quoteToken, uniPool, aavePool))
+            )
+        );
 
         emit Register(user);
     }
