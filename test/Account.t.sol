@@ -19,10 +19,13 @@ contract TestUserAccount is Test {
     address factory;
     address UserAccountImpl;
     address beacon;
-    address WETH_USDC_uniPool;
-    address WETH_USDC_aavePool;
+
+    // BASE
+    address WETH_USDC_uniPool = 0xd0b53D9277642d899DF5C87A3966A349A798F224;
+    address aavePool = 0xA238Dd80C259a72e81d7e4664a9801593F98d1c5;
     address WETH = 0x4200000000000000000000000000000000000006;
     address USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
+    address aUSDC = 0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB;
 
     function setUp() public {
         // prepare BASE network environment
@@ -33,6 +36,7 @@ contract TestUserAccount is Test {
         beaconOwner = makeAddr("beaconOwner");
         factoryAdmin = makeAddr("factoryAdmin");
         factoryProxyAdmin = makeAddr("factoryProxyAdmin");
+
         UserAccountImpl = address(new UserAccount());
         beacon = address(new Beacon(UserAccountImpl, beaconOwner));
         factoryImpl = address(new UserAccountFactory());
@@ -40,7 +44,10 @@ contract TestUserAccount is Test {
             new TUProxy(
                 factoryImpl,
                 factoryProxyAdmin,
-                abi.encodeCall(UserAccountFactory.initialize, (factoryAdmin, beacon, WETH, USDC))
+                abi.encodeCall(
+                    UserAccountFactory.initialize,
+                    (factoryAdmin, beacon, WETH, USDC, aUSDC, WETH_USDC_uniPool, aavePool)
+                )
             )
         );
 
@@ -50,7 +57,7 @@ contract TestUserAccount is Test {
     }
 
     function test_init() public {
-        address userAAccountAddr = UserAccountFactory(factory).UserAccounts(userA);
+        address userAAccountAddr = UserAccountFactory(factory).UserToAccount(userA);
         console.log("User A account:", userAAccountAddr);
 
         uint256 decimals = IERC20Metadata(WETH).decimals();
