@@ -1,4 +1,8 @@
 {
+  "name": "loan",
+  "scripts": {
+    "build": "yarn && forge clean && forge build && yarn hardhat clean && yarn hardhat compile"
+  },
   "dependencies": {
     "@derivation-tech/web3-core": "^1.0.38",
     "@nomicfoundation/hardhat-foundry": "^1.1.2",
