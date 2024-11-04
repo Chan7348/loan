@@ -35,6 +35,7 @@ contract CustodianFactory is ICustodianFactory, Initializable, AccessControlUpgr
         address _admin,
         address _beacon,
         address _baseToken,
+        address _aBaseToken,
         address _quoteToken,
         address _aQuoteToken,
         address _uniPool,
@@ -44,6 +45,7 @@ contract CustodianFactory is ICustodianFactory, Initializable, AccessControlUpgr
         __ReentrancyGuard_init();
         beacon = _beacon;
         baseToken = _baseToken;
+        aBaseToken = _aBaseToken;
         quoteToken = _quoteToken;
         aQuoteToken = _aQuoteToken;
         uniPool = _uniPool;

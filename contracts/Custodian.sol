@@ -49,16 +49,27 @@ contract Custodian is ICustodian, Initializable, ReentrancyGuardUpgradeable, IUn
         __ReentrancyGuard_init();
     }
 
+    function baseReserve() public returns (uint256) {
+        return IERC20(_baseToken()).balanceOf(address(this));
+    }
+
+    function quoteReserve() public returns (uint256) {
+        return IERC20(_quoteToken()).balanceOf(address(this));
+    }
+
     function deposit(bool isBase, uint256 amount) external onlyUser nonReentrant {
-
         address token = isBase ? _baseToken() : _quoteToken();
-
         IERC20(token).transferFrom(msg.sender, address(this), amount);
     }
 
-    function withdraw(bool isBase, uint256 amount) external onlyUser nonReentrant {
-        if (isBase) IERC20(_baseToken()).transfer(msg.sender, amount);
-        else IERC20(_quoteToken()).transfer(msg.sender, amount);
+    function withdraw(bool isBase, uint256 amount, bool isFullyWithdraw) external onlyUser nonReentrant {
+        if (isBase) {
+            amount = isFullyWithdraw ? IERC20(_baseToken()).balanceOf(address(this)) : amount;
+            IERC20(_baseToken()).transfer(msg.sender, amount);
+        } else {
+            amount = isFullyWithdraw ? IERC20(_quoteToken()).balanceOf(address(this)) : amount;
+            IERC20(_quoteToken()).transfer(msg.sender, amount);
+        }
     }
 
     // keep a few base token as margin, then mortgage in quote token, and borrow more base token

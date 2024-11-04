@@ -19,6 +19,7 @@ interface ICustodianFactory {
         address _admin,
         address _beacon,
         address _baseToken,
+        address _aBaseToken,
         address _quoteToken,
         address _aQuoteToken,
         address _uniPool,

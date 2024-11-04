@@ -21,3 +21,4 @@ ignition/deployments/chain-31337
 /out
 
 /bin
+.DS_Store
