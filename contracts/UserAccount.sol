@@ -15,14 +15,14 @@ import "forge-std/Test.sol";
 contract UserAccount is IUserAccount, Initializable, ReentrancyGuardUpgradeable, IUniswapV3SwapCallback {
     address public factory;
 
-    uint256 public baseBalance;
-    uint256 public quoteBalance;
-
-    bool public isPositionOpen;
+    bool public isLongPositionOpen;
+    bool public isShortPositionOpen;
     bool private isBaseZero; // identify during swap on Uniswap
 
-    error PositionExists();
-    error PositionNonexists();
+    error OpenLongFailed();
+    error OpenShortFailed();
+    error CloseLongFailed();
+    error CloseShortFailed();
     error NotEnoughMargin(bool isBase);
     error NotUser();
 
@@ -48,22 +48,17 @@ contract UserAccount is IUserAccount, Initializable, ReentrancyGuardUpgradeable,
         address quoteToken = IUserAccountFactory(factory).quoteToken();
         isBaseZero = baseToken < quoteToken ? true : false;
         // console.log("isBaseZero:", isBaseZero);
-        address aavePool = IUserAccountFactory(factory).aavePool();
-        IPool(aavePool).setUserUseReserveAsCollateral(baseToken, true);
-        IPool(aavePool).setUserUseReserveAsCollateral(quoteToken, true);
         __ReentrancyGuard_init();
     }
 
     function deposit(bool isBase, uint256 amount) external onlyUser nonReentrant {
-        if (isBase) {
-            address baseToken = IUserAccountFactory(factory).baseToken();
-            IERC20(baseToken).transferFrom(msg.sender, address(this), amount);
-            baseBalance += amount;
-        } else {
-            address quoteToken = IUserAccountFactory(factory).quoteToken();
-            IERC20(quoteToken).transferFrom(msg.sender, address(this), amount);
-            quoteBalance += amount;
-        }
+        address aavePool = IUserAccountFactory(factory).aavePool();
+        address token = isBase ? IUserAccountFactory(factory).baseToken() : IUserAccountFactory(factory).quoteToken();
+
+        IERC20(token).transferFrom(msg.sender, address(this), amount);
+        IERC20(token).approve(aavePool, amount);
+        IPool(aavePool).supply(token, amount, address(this), 0);
+        // IPool(aavePool).setUserUseReserveAsCollateral(token, true);
     }
 
     function withdraw(bool isBase, uint256 amount) external onlyUser nonReentrant {
@@ -84,13 +79,16 @@ contract UserAccount is IUserAccount, Initializable, ReentrancyGuardUpgradeable,
     // repay minimum USDC to Uniswap
     // Finally, we have more WETH in collateral.
     function openLong() external onlyUser nonReentrant {
-        require(!isPositionOpen, PositionExists());
-        require(baseBalance > 0, NotEnoughMargin(true));
+        require(!isLongPositionOpen && !isShortPositionOpen, OpenLongFailed());
+
+        uint balance = IERC20(IUserAccountFactory(factory).baseToken()).balanceOf(address(this));
+
+        require(balance > 0, NotEnoughMargin(true));
         address uniPool = IUserAccountFactory(factory).uniPool();
         IUniswapV3Pool(uniPool).swap(
             address(this), // recipient
             isBaseZero ? false : true, // zeroForOne
-            -int256(baseBalance), // amountSpecified
+            -int256(balance), // amountSpecified
             1461446703485210103287273052203988822378723970341, // minimum sqrtPriceLimitX96
             abi.encode(Action.OPENLONG) // callback data
         );
@@ -104,15 +102,15 @@ contract UserAccount is IUserAccount, Initializable, ReentrancyGuardUpgradeable,
     // repay minimum WETH to Uniswap
     // Finally, we have more USDC in collateral.
     function openShort() external onlyUser nonReentrant {
-        require(!isPositionOpen, PositionExists());
+        require(!isLongPositionOpen && !isShortPositionOpen, OpenShortFailed());
     }
 
     function closeLong() external onlyUser nonReentrant {
-        require(isPositionOpen, PositionNonexists());
+        require(isLongPositionOpen && !isShortPositionOpen, CloseLongFailed());
     }
 
     function closeShort() external onlyUser nonReentrant {
-        require(isPositionOpen, PositionNonexists());
+        require(!isLongPositionOpen && isShortPositionOpen, CloseShortFailed());
     }
 
     function uniswapV3SwapCallback(int256 amount0Delta, int256 amount1Delta, bytes calldata data) external {
