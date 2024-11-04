@@ -91,13 +91,7 @@ contract Custodian is ICustodian, Initializable, ReentrancyGuardUpgradeable, IUn
         uint amount = baseReserve();
         require(amount > 0, NotEnoughMargin(true));
 
-        IUniswapV3Pool(_uniPool()).swap(
-            address(this), // recipient
-            isBaseZero ? false : true, // zeroForOne
-            -int256(amount * (leverage - 1)), // amountSpecified
-            isBaseZero ? 1461446703485210103287273052203988822378723970341 : 4295128740, // sqrtPriceLimitX96
-            abi.encode(Action.OPENLONG) // callback data
-        );
+        IUniswapV3Pool(_uniPool()).swap(address(this), isBaseZero ? false : true, -int256(amount * (leverage - 1)), isBaseZero ? 1461446703485210103287273052203988822378723970341 : 4295128740, abi.encode(Action.OPENLONG));
     }
 
     // keep a few quote token as margin, then mortage in base token, and borrow more quote token
