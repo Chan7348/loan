@@ -25,9 +25,12 @@ contract Custodian is ICustodian, Initializable, ReentrancyGuardUpgradeable, IUn
     error CloseShortFailed();
     error NotEnoughMargin(bool isBase);
     error NotUser();
+    error ClosePositionFailed();
 
     event OpenLong(uint256 baseStaked, uint256 quoteDebt);
     event OpenShort(uint256 quoteStaked, uint256 baseDebt);
+    event CloseLong();
+    event CloseShort();
 
     enum Action {
         OPENLONG,
@@ -119,10 +122,20 @@ contract Custodian is ICustodian, Initializable, ReentrancyGuardUpgradeable, IUn
         );
     }
 
+    //
     function closeLong() public onlyUser nonReentrant {
         require(isLongPositionOpen && !isShortPositionOpen, CloseLongFailed());
 
-        // uint amount =
+        uint256 debtAmount = IERC20(_aaveDebtQuoteToken()).balanceOf(address(this));
+        require(debtAmount > 0, ClosePositionFailed());
+
+        IUniswapV3Pool(_uniPool()).swap(
+            address(this), // recepient
+            isBaseZero ? true : false, // zeroForOne
+            -int256(debtAmount), // amountSpecified
+            isBaseZero ? 4295128740 : 1461446703485210103287273052203988822378723970341, // sqrtPriceLimitX96
+            abi.encode(Action.CLOSELONG) // callback data
+        );
     }
 
     function closeShort() public onlyUser nonReentrant {
@@ -146,10 +159,11 @@ contract Custodian is ICustodian, Initializable, ReentrancyGuardUpgradeable, IUn
             // repay to Uniswap
             IERC20(_quoteToken()).transfer(msg.sender, quoteInAmount);
 
+            isLongPositionOpen = true;
             emit OpenLong(baseAmount, quoteInAmount);
         } else if (action == Action.OPENSHORT) {
             // WETH we need to repay to Uniswap
-            uint256 baseInAmount = uint256(isBaseZero ? amount0Delta: amount1Delta);
+            uint256 baseInAmount = uint256(isBaseZero ? amount0Delta : amount1Delta);
 
             uint256 quoteAmount = quoteReserve();
             IERC20(_quoteToken()).approve(_aavePool(), quoteAmount);
@@ -159,7 +173,27 @@ contract Custodian is ICustodian, Initializable, ReentrancyGuardUpgradeable, IUn
             // repay to Uniswap
             IERC20(_baseToken()).transfer(msg.sender, baseInAmount);
 
+            isShortPositionOpen = true;
             emit OpenShort(quoteAmount, baseInAmount);
+        } else if (action == Action.CLOSELONG) {
+            // WETH amount we need to repay to Uniswap
+            uint256 baseInAmount = uint256(isBaseZero ? amount0Delta : amount1Delta);
+
+            // 还款USDC给aave
+            uint256 quoteDebtAmount = IERC20(_aaveDebtQuoteToken()).balanceOf(address(this));
+            IERC20(_quoteToken()).approve(_aavePool(), quoteDebtAmount);
+            IPool(_aavePool()).repay(_quoteToken(), quoteDebtAmount, 2, address(this));
+
+            // 取出所有的WETH
+            uint256 quoteOverall = IERC20(_aaveBaseToken()).balanceOf(address(this));
+            IERC20(_aaveBaseToken()).approve(_aavePool(), quoteOverall);
+            IPool(_aavePool()).withdraw(_baseToken(), quoteOverall, address(this));
+
+            // repay to Uniswap
+            IERC20(_baseToken()).transfer(msg.sender, baseInAmount);
+
+            isLongPositionOpen = false;
+            emit CloseLong();
         }
     }
 

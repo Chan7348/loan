@@ -63,7 +63,7 @@ contract TestCustodian is Test {
         );
         vm.label(factory, "factory");
 
-        deal(WETH, user1, 1 * 10**IERC20Metadata(WETH).decimals());
+        deal(WETH, user1, 1 * 10**IERC20Metadata(WETH).decimals()/10000);
         deal(USDC, user1, 3000 * 10**IERC20Metadata(USDC).decimals());
 
         vm.startPrank(user1);
@@ -149,7 +149,14 @@ contract TestCustodian is Test {
     }
 
     function test_closeLong() public {
+        //  WETH-> 欠款USDC, 进入回调
+        test_openLong();
+        vm.startPrank(user1);
+        ICustodian(custodian1).closeLong();
+        vm.stopPrank();
 
+        console.log("WETH balance finally:", IERC20(WETH).balanceOf(custodian1));
+        // 主要磨损是两次swap手续费
     }
 
     function test_closeShort() public {
