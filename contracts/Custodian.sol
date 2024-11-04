@@ -113,13 +113,7 @@ contract Custodian is ICustodian, Initializable, ReentrancyGuardUpgradeable, IUn
         uint amount = quoteReserve();
         require(amount > 0, NotEnoughMargin(false));
 
-        IUniswapV3Pool(_uniPool()).swap(
-            address(this), // recipient
-            isBaseZero ? true : false, // zeroForOne
-            -int256(amount * (leverage - 1)), // amountSpecified
-            isBaseZero ? 4295128740 : 1461446703485210103287273052203988822378723970341, // sqrtPriceLimitX96
-            abi.encode(Action.OPENSHORT) // callback data
-        );
+        IUniswapV3Pool(_uniPool()).swap(address(this), isBaseZero ? true : false, -int256(amount * (leverage - 1)), isBaseZero ? 4295128740 : 1461446703485210103287273052203988822378723970341, abi.encode(Action.OPENSHORT));
     }
 
     //
@@ -129,17 +123,16 @@ contract Custodian is ICustodian, Initializable, ReentrancyGuardUpgradeable, IUn
         uint256 debtAmount = IERC20(_aaveDebtQuoteToken()).balanceOf(address(this));
         require(debtAmount > 0, ClosePositionFailed());
 
-        IUniswapV3Pool(_uniPool()).swap(
-            address(this), // recepient
-            isBaseZero ? true : false, // zeroForOne
-            -int256(debtAmount), // amountSpecified
-            isBaseZero ? 4295128740 : 1461446703485210103287273052203988822378723970341, // sqrtPriceLimitX96
-            abi.encode(Action.CLOSELONG) // callback data
-        );
+        IUniswapV3Pool(_uniPool()).swap(address(this), isBaseZero ? true : false, -int256(debtAmount), isBaseZero ? 4295128740 : 1461446703485210103287273052203988822378723970341, abi.encode(Action.CLOSELONG));
     }
 
     function closeShort() public onlyUser nonReentrant {
         require(!isLongPositionOpen && isShortPositionOpen, CloseShortFailed());
+
+        uint256 debtAmount = IERC20(_aaveDebtBaseToken()).balanceOf(address(this));
+        require(debtAmount > 0, ClosePositionFailed());
+
+        IUniswapV3Pool(_uniPool()).swap(address(this), isBaseZero ? false : true, -int256(debtAmount), isBaseZero ? 1461446703485210103287273052203988822378723970341 : 4295128740, abi.encode(Action.CLOSESHORT));
     }
 
     function uniswapV3SwapCallback(int256 amount0Delta, int256 amount1Delta, bytes calldata data) external {
@@ -185,15 +178,34 @@ contract Custodian is ICustodian, Initializable, ReentrancyGuardUpgradeable, IUn
             IPool(_aavePool()).repay(_quoteToken(), quoteDebtAmount, 2, address(this));
 
             // 取出所有的WETH
-            uint256 quoteOverall = IERC20(_aaveBaseToken()).balanceOf(address(this));
-            IERC20(_aaveBaseToken()).approve(_aavePool(), quoteOverall);
-            IPool(_aavePool()).withdraw(_baseToken(), quoteOverall, address(this));
+            uint256 baseOverall = IERC20(_aaveBaseToken()).balanceOf(address(this));
+            IERC20(_aaveBaseToken()).approve(_aavePool(), baseOverall);
+            IPool(_aavePool()).withdraw(_baseToken(), baseOverall, address(this));
 
             // repay to Uniswap
             IERC20(_baseToken()).transfer(msg.sender, baseInAmount);
 
             isLongPositionOpen = false;
             emit CloseLong();
+        } else if (action == Action.CLOSESHORT) {
+            // USDC amount wee need to repay to Uniswap
+            uint256 quoteInAmount = uint256(isBaseZero ? amount1Delta : amount0Delta);
+
+            // 还款WETH给aave
+            uint256 baseDebtAmount = IERC20(_aaveDebtBaseToken()).balanceOf(address(this));
+            IERC20(_baseToken()).approve(_aavePool(), baseDebtAmount);
+            IPool(_aavePool()).repay(_baseToken(), baseDebtAmount, 2, address(this));
+
+            // 取出所有的USDC
+            uint256 quoteOverall = IERC20(_aaveQuoteToken()).balanceOf(address(this));
+            IERC20(_aaveQuoteToken()).approve(_aavePool(), quoteOverall);
+            IPool(_aavePool()).withdraw(_quoteToken(), quoteOverall, address(this));
+
+            // repay to Uniswap
+            IERC20(_quoteToken()).transfer(msg.sender, quoteInAmount);
+
+            isShortPositionOpen = false;
+            emit CloseShort();
         }
     }
 

@@ -160,6 +160,11 @@ contract TestCustodian is Test {
     }
 
     function test_closeShort() public {
+        test_openShort();
+        vm.startPrank(user1);
+        ICustodian(custodian1).closeShort();
+        vm.stopPrank();
 
+        console.log("USDC balance finally", IERC20(USDC).balanceOf(custodian1));
     }
 }
