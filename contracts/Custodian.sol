@@ -27,6 +27,7 @@ contract Custodian is ICustodian, Initializable, ReentrancyGuardUpgradeable, IUn
     error NotUser();
 
     event OpenLong(uint256 baseStaked, uint256 quoteDebt);
+    event OpenShort(uint256 quoteStaked, uint256 baseDebt);
 
     enum Action {
         OPENLONG,
@@ -81,7 +82,7 @@ contract Custodian is ICustodian, Initializable, ReentrancyGuardUpgradeable, IUn
     // use all WETH as margin to borrow USDC(on aave)
     // repay minimum USDC to Uniswap
     // Finally, we have more WETH in collateral.
-    function openLong(uint256 leverage) external onlyUser nonReentrant {
+    function openLong(uint256 leverage) public onlyUser nonReentrant {
         require(!isLongPositionOpen && !isShortPositionOpen, OpenLongFailed());
 
         uint amount = baseReserve();
@@ -90,8 +91,8 @@ contract Custodian is ICustodian, Initializable, ReentrancyGuardUpgradeable, IUn
         IUniswapV3Pool(_uniPool()).swap(
             address(this), // recipient
             isBaseZero ? false : true, // zeroForOne
-            -int256(amount * leverage), // amountSpecified
-            1461446703485210103287273052203988822378723970341, // minimum sqrtPriceLimitX96
+            -int256(amount * (leverage - 1)), // amountSpecified
+            isBaseZero ? 1461446703485210103287273052203988822378723970341 : 4295128740, // sqrtPriceLimitX96
             abi.encode(Action.OPENLONG) // callback data
         );
     }
@@ -103,15 +104,26 @@ contract Custodian is ICustodian, Initializable, ReentrancyGuardUpgradeable, IUn
     // use all USDC as margin to borrow WETH(on aave)
     // repay minimum WETH to Uniswap
     // Finally, we have more USDC in collateral.
-    function openShort(uint256 leverage) external onlyUser nonReentrant {
+    function openShort(uint256 leverage) public onlyUser nonReentrant {
         require(!isLongPositionOpen && !isShortPositionOpen, OpenShortFailed());
+
+        uint amount = quoteReserve();
+        require(amount > 0, NotEnoughMargin(false));
+
+        IUniswapV3Pool(_uniPool()).swap(
+            address(this), // recipient
+            isBaseZero ? true : false, // zeroForOne
+            -int256(amount * (leverage - 1)), // amountSpecified
+            isBaseZero ? 4295128740 : 1461446703485210103287273052203988822378723970341, // sqrtPriceLimitX96
+            abi.encode(Action.OPENSHORT) // callback data
+        );
     }
 
-    function closeLong() external onlyUser nonReentrant {
+    function closeLong() public onlyUser nonReentrant {
         require(isLongPositionOpen && !isShortPositionOpen, CloseLongFailed());
     }
 
-    function closeShort() external onlyUser nonReentrant {
+    function closeShort() public onlyUser nonReentrant {
         require(!isLongPositionOpen && isShortPositionOpen, CloseShortFailed());
     }
 
@@ -133,6 +145,19 @@ contract Custodian is ICustodian, Initializable, ReentrancyGuardUpgradeable, IUn
             IERC20(_quoteToken()).transfer(msg.sender, quoteInAmount);
 
             emit OpenLong(baseAmount, quoteInAmount);
+        } else if (action == Action.OPENSHORT) {
+            // WETH we need to repay to Uniswap
+            uint256 baseInAmount = uint256(isBaseZero ? amount0Delta: amount1Delta);
+
+            uint256 quoteAmount = quoteReserve();
+            IERC20(_quoteToken()).approve(_aavePool(), quoteAmount);
+            IPool(_aavePool()).supply(_quoteToken(), quoteAmount, address(this), 0);
+            IPool(_aavePool()).borrow(_baseToken(), baseInAmount, 2, 0, address(this));
+
+            // repay to Uniswap
+            IERC20(_baseToken()).transfer(msg.sender, baseInAmount);
+
+            emit OpenShort(quoteAmount, baseInAmount);
         }
     }
 

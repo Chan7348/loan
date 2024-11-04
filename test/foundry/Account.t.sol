@@ -124,16 +124,24 @@ contract TestCustodian is Test {
         test_deposit();
 
         vm.startPrank(user1);
-        ICustodian(custodian1).openLong(3);
+        ICustodian(custodian1).openLong(2);
         vm.stopPrank();
+        // ETH/USDC 价格为 $2459.488804
         // 单纯持有1 ETH时，相当于 1 倍杠杆
-        // 2倍杠杆时，开仓存有 2 ETH，欠有2459.488804 USDC, 价格上涨 25% 时，关仓可获得 1.2 ETH，收益 0.2 ETH
+        // 2倍杠杆时，开仓存有 2 ETH，欠有2459.488804 USDC, ETH价格上涨 25% 时，关仓可获得 1.2 ETH，收益 0.2 ETH, 收益率 20%
         // 3倍杠杆时，存有 3 ETH，欠有4919.030274 USDC
         // 4倍杠杆时，存有
     }
 
     function test_openShort() public {
+        test_deposit();
 
+        vm.startPrank(user1);
+        ICustodian(custodian1).openShort(2);
+        // ETH/USDC 价格为 $2459.488804
+        // 单纯持有3000 USDC时，相当于 1 倍杠杆
+        // 2倍杠杆时，开仓存有 6000 USDC, 欠有 1.221 ETH, ETH价格下降 20%时，关仓可获得 3597.57 USDC, 收益 597.57 USDC，收益率 20%
+        vm.stopPrank();
     }
 
     function test_closeLong() public {
