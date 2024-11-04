@@ -4,15 +4,15 @@ pragma solidity 0.8.27;
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-import {IUserAccount} from "./interfaces/IUserAccount.sol";
-import {IUserAccountFactory} from "./interfaces/IUserAccountFactory.sol";
+import {ICustodian} from "./interfaces/ICustodian.sol";
+import {ICustodianFactory} from "./interfaces/ICustodianFactory.sol";
 import {IUniswapV3SwapCallback} from "./interfaces/uniswap/callback/IUniswapV3SwapCallback.sol";
 import {IUniswapV3Pool} from "./interfaces/uniswap/IUniswapV3Pool.sol";
 import {IPool} from "./interfaces/aave/IPool.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "forge-std/Test.sol";
 
-contract UserAccount is IUserAccount, Initializable, ReentrancyGuardUpgradeable, IUniswapV3SwapCallback {
+contract Custodian is ICustodian, Initializable, ReentrancyGuardUpgradeable, IUniswapV3SwapCallback {
     address public factory;
 
     bool public isLongPositionOpen;
@@ -34,7 +34,7 @@ contract UserAccount is IUserAccount, Initializable, ReentrancyGuardUpgradeable,
     }
 
     modifier onlyUser() {
-        require(msg.sender == IUserAccountFactory(factory).AccountToUser(address(this)), NotUser());
+        require(msg.sender == ICustodianFactory(factory).AccountToUser(address(this)), NotUser());
         _;
     }
 
@@ -44,31 +44,21 @@ contract UserAccount is IUserAccount, Initializable, ReentrancyGuardUpgradeable,
 
     function initialize(address _factory) external initializer {
         factory = _factory;
-        address baseToken = IUserAccountFactory(factory).baseToken();
-        address quoteToken = IUserAccountFactory(factory).quoteToken();
-        isBaseZero = baseToken < quoteToken ? true : false;
+        isBaseZero = _baseToken() < _quoteToken() ? true : false;
         // console.log("isBaseZero:", isBaseZero);
         __ReentrancyGuard_init();
     }
 
     function deposit(bool isBase, uint256 amount) external onlyUser nonReentrant {
-        address aavePool = IUserAccountFactory(factory).aavePool();
-        address token = isBase ? IUserAccountFactory(factory).baseToken() : IUserAccountFactory(factory).quoteToken();
+
+        address token = isBase ? _baseToken() : _quoteToken();
 
         IERC20(token).transferFrom(msg.sender, address(this), amount);
-        IERC20(token).approve(aavePool, amount);
-        IPool(aavePool).supply(token, amount, address(this), 0);
-        // IPool(aavePool).setUserUseReserveAsCollateral(token, true);
     }
 
     function withdraw(bool isBase, uint256 amount) external onlyUser nonReentrant {
-        if (isBase) {
-            address baseToken = IUserAccountFactory(factory).baseToken();
-            IERC20(baseToken).transfer(msg.sender, amount);
-        } else {
-            address quoteToken = IUserAccountFactory(factory).quoteToken();
-            IERC20(quoteToken).transfer(msg.sender, amount);
-        }
+        if (isBase) IERC20(_baseToken()).transfer(msg.sender, amount);
+        else IERC20(_quoteToken()).transfer(msg.sender, amount);
     }
 
     // keep a few base token as margin, then mortgage in quote token, and borrow more base token
@@ -81,10 +71,13 @@ contract UserAccount is IUserAccount, Initializable, ReentrancyGuardUpgradeable,
     function openLong() external onlyUser nonReentrant {
         require(!isLongPositionOpen && !isShortPositionOpen, OpenLongFailed());
 
-        uint balance = IERC20(IUserAccountFactory(factory).baseToken()).balanceOf(address(this));
+        uint256 balance = IERC20(_baseToken()).balanceOf(address(this));
 
         require(balance > 0, NotEnoughMargin(true));
-        address uniPool = IUserAccountFactory(factory).uniPool();
+
+        IERC20(_baseToken()).approve(_aavePool(), balance);
+        IPool(_aavePool()).supply(_baseToken(), balance, address(this), 0);
+        address uniPool = ICustodianFactory(factory).uniPool();
         IUniswapV3Pool(uniPool).swap(
             address(this), // recipient
             isBaseZero ? false : true, // zeroForOne
@@ -114,9 +107,6 @@ contract UserAccount is IUserAccount, Initializable, ReentrancyGuardUpgradeable,
     }
 
     function uniswapV3SwapCallback(int256 amount0Delta, int256 amount1Delta, bytes calldata data) external {
-        address baseToken = IUserAccountFactory(factory).baseToken();
-        address quoteToken = IUserAccountFactory(factory).quoteToken();
-        address aavePool = IUserAccountFactory(factory).aavePool();
         Action action = abi.decode(data, (Action));
         if (action == Action.OPENLONG) {
             // WETH amount we got
@@ -124,14 +114,38 @@ contract UserAccount is IUserAccount, Initializable, ReentrancyGuardUpgradeable,
             // USDC we need to repay to Uniswap
             uint256 quoteInAmount = uint256(isBaseZero ? amount1Delta : amount0Delta);
 
-            uint256 baseAmount = IERC20(baseToken).balanceOf(address(this));
+            uint256 baseAmount = IERC20(_baseToken()).balanceOf(address(this));
 
-            IERC20(baseToken).approve(aavePool, baseAmount);
-            IPool(aavePool).supply(baseToken, baseAmount, address(this), 0);
-            IPool(aavePool).borrow(quoteToken, quoteInAmount, 2, 0, address(this));
+            IERC20(_baseToken()).approve(_aavePool(), baseAmount);
+            IPool(_aavePool()).supply(_baseToken(), baseAmount, address(this), 0);
+            IPool(_aavePool()).borrow(_quoteToken(), quoteInAmount, 2, 0, address(this));
 
             // repay to Uniswap
-            IERC20(quoteToken).transfer(msg.sender, quoteInAmount);
+            IERC20(_quoteToken()).transfer(msg.sender, quoteInAmount);
         }
+    }
+
+    function _baseToken() private returns (address) {
+        return ICustodianFactory(factory).baseToken();
+    }
+
+    function _aBaseToken() private returns (address) {
+        return ICustodianFactory(factory).aBaseToken();
+    }
+
+    function _quoteToken() private returns (address) {
+        return ICustodianFactory(factory).quoteToken();
+    }
+
+    function _aQuoteToken() private returns (address) {
+        return ICustodianFactory(factory).aQuoteToken();
+    }
+
+    function _uniPool() private returns (address) {
+        return ICustodianFactory(factory).uniPool();
+    }
+
+    function _aavePool() private returns (address) {
+        return ICustodianFactory(factory).aavePool();
     }
 }

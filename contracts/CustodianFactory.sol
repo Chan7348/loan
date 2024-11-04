@@ -5,26 +5,25 @@ import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/acce
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {BUProxy} from "./proxy/BUProxy.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {IUserAccount} from "./interfaces/IUserAccount.sol";
-import {IUserAccountFactory} from "./interfaces/IUserAccountFactory.sol";
+import {ICustodian} from "./interfaces/ICustodian.sol";
+import {ICustodianFactory} from "./interfaces/ICustodianFactory.sol";
 
-contract UserAccountFactory is
-    IUserAccountFactory,
-    Initializable,
-    AccessControlUpgradeable,
-    ReentrancyGuardUpgradeable
-{
+contract CustodianFactory is ICustodianFactory, Initializable, AccessControlUpgradeable, ReentrancyGuardUpgradeable {
     mapping(address user => address account) public UserToAccount;
     mapping(address account => address user) public AccountToUser;
 
     address public beacon;
+
     address public baseToken;
+    address public aBaseToken;
+
     address public quoteToken;
     address public aQuoteToken;
+
     address public uniPool;
     address public aavePool;
 
-    error UserAccountExists(address user, address UserAccount);
+    error CustodianExists(address user, address Custodian);
 
     event Register(address indexed user);
 
@@ -53,9 +52,9 @@ contract UserAccountFactory is
 
     function register() external {
         address user = msg.sender;
-        require(UserToAccount[user] == address(0), UserAccountExists(user, UserToAccount[user]));
+        require(UserToAccount[user] == address(0), CustodianExists(user, UserToAccount[user]));
 
-        address account = address(new BUProxy(beacon, abi.encodeCall(IUserAccount.initialize, (address(this)))));
+        address account = address(new BUProxy(beacon, abi.encodeCall(ICustodian.initialize, (address(this)))));
         UserToAccount[user] = account;
         AccountToUser[account] = user;
         emit Register(user);

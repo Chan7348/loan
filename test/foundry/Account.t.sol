@@ -1,26 +1,28 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.27;
 
-import "contracts/UserAccountFactory.sol";
+import "contracts/CustodianFactory.sol";
 import "contracts/Beacon.sol";
 import "contracts/proxy/TUProxy.sol";
 import "contracts/proxy/BUProxy.sol";
 import "forge-std/Test.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 // import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {UserAccount} from "contracts/UserAccount.sol";
+import {Custodian} from "contracts/Custodian.sol";
 
-contract TestUserAccount is Test {
+contract TestCustodian is Test {
     event Transfer(address indexed from, address indexed to, uint256 value);
 
     address beaconOwner;
     address factoryAdmin;
     address factoryProxyAdmin;
-    address userA;
+
+    address user1;
+    address custodian1;
 
     address factoryImpl;
     address factory;
-    address UserAccountImpl;
+    address CustodianImpl;
     address beacon;
 
     // BASE
@@ -36,47 +38,48 @@ contract TestUserAccount is Test {
         vm.createSelectFork(vm.envString("LOCAL_RPC"));
         console.log("chain id:", block.chainid);
 
-        userA = makeAddr("userA");
+        user1 = makeAddr("user1");
         beaconOwner = makeAddr("beaconOwner");
         factoryAdmin = makeAddr("factoryAdmin");
         factoryProxyAdmin = makeAddr("factoryProxyAdmin");
 
-        UserAccountImpl = address(new UserAccount());
-        beacon = address(new Beacon(UserAccountImpl, beaconOwner));
-        factoryImpl = address(new UserAccountFactory());
+        CustodianImpl = address(new Custodian());
+        beacon = address(new Beacon(CustodianImpl, beaconOwner));
+        factoryImpl = address(new CustodianFactory());
         factory = address(
             new TUProxy(
                 factoryImpl,
                 factoryProxyAdmin,
                 abi.encodeCall(
-                    UserAccountFactory.initialize,
-                    (factoryAdmin, beacon, WETH, USDC, aUSDC, WETH_USDC_uniPool, aavePool)
+                    CustodianFactory.initialize, (factoryAdmin, beacon, WETH, USDC, aUSDC, WETH_USDC_uniPool, aavePool)
                 )
             )
         );
 
-        vm.startPrank(userA);
-        UserAccountFactory(factory).register();
+        vm.startPrank(user1);
+        CustodianFactory(factory).register();
         vm.stopPrank();
     }
 
     function test_init() public {
-        address userAAccountAddr = UserAccountFactory(factory).UserToAccount(userA);
-        console.log("User A account contract:", userAAccountAddr);
+        address custodian1 = CustodianFactory(factory).UserToAccount(user1);
+        console.log("User1 Custodian contract:", custodian1);
 
         uint256 decimals = IERC20Metadata(WETH).decimals();
         console.log(decimals);
 
-        deal(WETH, userA, 4 * 10 **IERC20Metadata(WETH).decimals());
+        deal(WETH, user1, 4 * 10 ** IERC20Metadata(WETH).decimals());
 
-        vm.startPrank(userA);
-        IERC20(WETH).approve(userAAccountAddr, type(uint256).max);
+        vm.startPrank(user1);
+        IERC20(WETH).approve(custodian1, type(uint256).max);
 
         vm.expectEmit(aWETH);
-        emit Transfer(address(0), address(userAAccountAddr), IERC20(WETH).balanceOf(userA));
-        UserAccount(userAAccountAddr).deposit(true, IERC20(WETH).balanceOf(userA));
-        // UserAccount(userAAccountAddr).openLong();
+        emit Transfer(address(0), address(custodian1), IERC20(WETH).balanceOf(user1));
+        Custodian(custodian1).deposit(true, IERC20(WETH).balanceOf(user1));
+        Custodian(custodian1).openLong();
         vm.stopPrank();
-        console.log("userA account owns aWETH:", IERC20(aWETH).balanceOf(userAAccountAddr));
+        console.log("user1 Custodian owns aWETH:", IERC20(aWETH).balanceOf(custodian1));
     }
+
+    function test_deposit_base() public {}
 }
