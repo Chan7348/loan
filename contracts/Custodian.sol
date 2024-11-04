@@ -26,6 +26,8 @@ contract Custodian is ICustodian, Initializable, ReentrancyGuardUpgradeable, IUn
     error NotEnoughMargin(bool isBase);
     error NotUser();
 
+    event OpenLong(uint256 baseStaked, uint256 quoteDebt);
+
     enum Action {
         OPENLONG,
         OPENSHORT,
@@ -73,26 +75,22 @@ contract Custodian is ICustodian, Initializable, ReentrancyGuardUpgradeable, IUn
     }
 
     // keep a few base token as margin, then mortgage in quote token, and borrow more base token
-    // ex. WETH/USDC pair, long WETH,
-    // keep a few WETH as margin,
-    // flashswap USDC -> WETH(on Uniswap),
+    // ex. WETH/USDC pair, long WETH at $3000,
+    // keep 1 WETH as margin,
+    // flashswap USDC -> 5 WETH(on Uniswap),
     // use all WETH as margin to borrow USDC(on aave)
     // repay minimum USDC to Uniswap
     // Finally, we have more WETH in collateral.
-    function openLong() external onlyUser nonReentrant {
+    function openLong(uint256 leverage) external onlyUser nonReentrant {
         require(!isLongPositionOpen && !isShortPositionOpen, OpenLongFailed());
 
-        uint256 balance = IERC20(_baseToken()).balanceOf(address(this));
+        uint amount = baseReserve();
+        require(amount > 0, NotEnoughMargin(true));
 
-        require(balance > 0, NotEnoughMargin(true));
-
-        IERC20(_baseToken()).approve(_aavePool(), balance);
-        IPool(_aavePool()).supply(_baseToken(), balance, address(this), 0);
-        address uniPool = ICustodianFactory(factory).uniPool();
-        IUniswapV3Pool(uniPool).swap(
+        IUniswapV3Pool(_uniPool()).swap(
             address(this), // recipient
             isBaseZero ? false : true, // zeroForOne
-            -int256(balance), // amountSpecified
+            -int256(amount * leverage), // amountSpecified
             1461446703485210103287273052203988822378723970341, // minimum sqrtPriceLimitX96
             abi.encode(Action.OPENLONG) // callback data
         );
@@ -105,7 +103,7 @@ contract Custodian is ICustodian, Initializable, ReentrancyGuardUpgradeable, IUn
     // use all USDC as margin to borrow WETH(on aave)
     // repay minimum WETH to Uniswap
     // Finally, we have more USDC in collateral.
-    function openShort() external onlyUser nonReentrant {
+    function openShort(uint256 leverage) external onlyUser nonReentrant {
         require(!isLongPositionOpen && !isShortPositionOpen, OpenShortFailed());
     }
 
@@ -122,17 +120,19 @@ contract Custodian is ICustodian, Initializable, ReentrancyGuardUpgradeable, IUn
         if (action == Action.OPENLONG) {
             // WETH amount we got
             // uint256 baseOutAmount = uint256(isBaseZero ? -amount0Delta : -amount1Delta);
+
             // USDC we need to repay to Uniswap
             uint256 quoteInAmount = uint256(isBaseZero ? amount1Delta : amount0Delta);
 
-            uint256 baseAmount = IERC20(_baseToken()).balanceOf(address(this));
-
+            uint256 baseAmount = baseReserve();
             IERC20(_baseToken()).approve(_aavePool(), baseAmount);
             IPool(_aavePool()).supply(_baseToken(), baseAmount, address(this), 0);
             IPool(_aavePool()).borrow(_quoteToken(), quoteInAmount, 2, 0, address(this));
 
             // repay to Uniswap
             IERC20(_quoteToken()).transfer(msg.sender, quoteInAmount);
+
+            emit OpenLong(baseAmount, quoteInAmount);
         }
     }
 

@@ -8,8 +8,8 @@ interface ICustodian {
     function quoteReserve() external returns (uint256);
     function deposit(bool isBase, uint256 amount) external;
     function withdraw(bool isBase, uint256 amount, bool isFullyWithdraw) external;
-    function openLong() external;
-    function openShort() external;
+    function openLong(uint256 leverage) external;
+    function openShort(uint256 leverage) external;
     function closeLong() external;
     function closeShort() external;
 }

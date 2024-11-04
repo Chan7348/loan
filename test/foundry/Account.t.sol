@@ -121,7 +121,15 @@ contract TestCustodian is Test {
     }
 
     function test_openLong() public {
+        test_deposit();
 
+        vm.startPrank(user1);
+        ICustodian(custodian1).openLong(3);
+        vm.stopPrank();
+        // 单纯持有1 ETH时，相当于 1 倍杠杆
+        // 2倍杠杆时，开仓存有 2 ETH，欠有2459.488804 USDC, 价格上涨 25% 时，关仓可获得 1.2 ETH，收益 0.2 ETH
+        // 3倍杠杆时，存有 3 ETH，欠有4919.030274 USDC
+        // 4倍杠杆时，存有
     }
 
     function test_openShort() public {
