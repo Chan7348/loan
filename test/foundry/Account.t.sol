@@ -30,10 +30,12 @@ contract TestCustodian is Test {
     address aavePool = 0xA238Dd80C259a72e81d7e4664a9801593F98d1c5;
 
     address WETH = 0x4200000000000000000000000000000000000006;
-    address aWETH = 0xD4a0e0b9149BCee3C920d2E00b5dE09138fd8bb7;
+    address aaveWETH = 0xD4a0e0b9149BCee3C920d2E00b5dE09138fd8bb7;
+    address aaveDebtWETH = 0x24e6e0795b3c7c71D965fCc4f371803d1c1DcA1E;
 
     address USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
-    address aUSDC = 0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB;
+    address aaveUSDC = 0x4e65fE4DbA92790696d040ac24Aa414708F5c0AB;
+    address aaveDebtUSDC = 0x59dca05b6c26dbd64b5381374aAaC5CD05644C28;
 
     function setUp() public {
         // prepare BASE network environment
@@ -55,7 +57,7 @@ contract TestCustodian is Test {
                 factoryImpl,
                 factoryProxyAdmin,
                 abi.encodeCall(
-                    CustodianFactory.initialize, (factoryAdmin, beacon, WETH, aWETH, USDC, aUSDC, WETH_USDC_uniPool, aavePool)
+                    CustodianFactory.initialize, (factoryAdmin, beacon, WETH, USDC, WETH_USDC_uniPool, aavePool)
                 )
             )
         );
@@ -83,8 +85,10 @@ contract TestCustodian is Test {
 
         require(factoryInstance.baseToken() == WETH);
         require(factoryInstance.quoteToken() == USDC);
-        require(factoryInstance.aBaseToken() == aWETH);
-        require(factoryInstance.aQuoteToken() == aUSDC);
+        require(factoryInstance.aaveBaseToken() == aaveWETH);
+        require(factoryInstance.aaveQuoteToken() == aaveUSDC);
+        require(factoryInstance.aaveDebtBaseToken() == aaveDebtWETH);
+        require(factoryInstance.aaveDebtQuoteToken() == aaveDebtUSDC);
         require(factoryInstance.uniPool() == WETH_USDC_uniPool);
         require(factoryInstance.aavePool() == aavePool);
 

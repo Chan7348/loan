@@ -5,6 +5,7 @@ import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/acce
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {BUProxy} from "./proxy/BUProxy.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {IPool, DataTypes} from "./interfaces/aave/IPool.sol";
 import {ICustodian} from "./interfaces/ICustodian.sol";
 import {ICustodianFactory} from "./interfaces/ICustodianFactory.sol";
 
@@ -15,15 +16,18 @@ contract CustodianFactory is ICustodianFactory, Initializable, AccessControlUpgr
     address public beacon;
 
     address public baseToken;
-    address public aBaseToken;
+    address public aaveBaseToken;
+    address public aaveDebtBaseToken;
 
     address public quoteToken;
-    address public aQuoteToken;
+    address public aaveQuoteToken;
+    address public aaveDebtQuoteToken;
 
     address public uniPool;
     address public aavePool;
 
     error CustodianExists(address user, address Custodian);
+    error AaveRegistryError();
 
     event Register(address indexed user);
 
@@ -35,9 +39,7 @@ contract CustodianFactory is ICustodianFactory, Initializable, AccessControlUpgr
         address _admin,
         address _beacon,
         address _baseToken,
-        address _aBaseToken,
         address _quoteToken,
-        address _aQuoteToken,
         address _uniPool,
         address _aavePool
     ) external initializer {
@@ -45,11 +47,13 @@ contract CustodianFactory is ICustodianFactory, Initializable, AccessControlUpgr
         __ReentrancyGuard_init();
         beacon = _beacon;
         baseToken = _baseToken;
-        aBaseToken = _aBaseToken;
         quoteToken = _quoteToken;
-        aQuoteToken = _aQuoteToken;
+
         uniPool = _uniPool;
         aavePool = _aavePool;
+
+        (aaveBaseToken, aaveDebtBaseToken) = _parseReserveData(baseToken);
+        (aaveQuoteToken, aaveDebtQuoteToken) = _parseReserveData(quoteToken);
     }
 
     function register() external {
@@ -60,5 +64,12 @@ contract CustodianFactory is ICustodianFactory, Initializable, AccessControlUpgr
         UserToAccount[user] = account;
         AccountToUser[account] = user;
         emit Register(user);
+    }
+
+    function _parseReserveData(address token) private returns (address aaveToken, address aaveDebtToken){
+            DataTypes.ReserveDataLegacy memory data = IPool(aavePool).getReserveData(token);
+            aaveToken = data.aTokenAddress;
+            aaveDebtToken = data.variableDebtTokenAddress;
+            require(aaveToken != address(0) && aaveDebtToken != address(0), AaveRegistryError());
     }
 }

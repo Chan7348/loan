@@ -121,6 +121,8 @@ contract Custodian is ICustodian, Initializable, ReentrancyGuardUpgradeable, IUn
 
     function closeLong() public onlyUser nonReentrant {
         require(isLongPositionOpen && !isShortPositionOpen, CloseLongFailed());
+
+        // uint amount =
     }
 
     function closeShort() public onlyUser nonReentrant {
@@ -165,16 +167,24 @@ contract Custodian is ICustodian, Initializable, ReentrancyGuardUpgradeable, IUn
         return ICustodianFactory(factory).baseToken();
     }
 
-    function _aBaseToken() private returns (address) {
-        return ICustodianFactory(factory).aBaseToken();
+    function _aaveBaseToken() private returns (address) {
+        return ICustodianFactory(factory).aaveBaseToken();
+    }
+
+    function _aaveDebtBaseToken() private returns (address) {
+        return ICustodianFactory(factory).aaveDebtBaseToken();
     }
 
     function _quoteToken() private returns (address) {
         return ICustodianFactory(factory).quoteToken();
     }
 
-    function _aQuoteToken() private returns (address) {
-        return ICustodianFactory(factory).aQuoteToken();
+    function _aaveQuoteToken() private returns (address) {
+        return ICustodianFactory(factory).aaveQuoteToken();
+    }
+
+    function _aaveDebtQuoteToken() private returns (address) {
+        return ICustodianFactory(factory).aaveDebtQuoteToken();
     }
 
     function _uniPool() private returns (address) {

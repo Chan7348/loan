@@ -7,10 +7,12 @@ interface ICustodianFactory {
     function beacon() external returns (address);
 
     function baseToken() external returns (address);
-    function aBaseToken() external returns (address);
+    function aaveBaseToken() external returns (address);
+    function aaveDebtBaseToken() external returns (address);
 
     function quoteToken() external returns (address);
-    function aQuoteToken() external returns (address);
+    function aaveQuoteToken() external returns (address);
+    function aaveDebtQuoteToken() external returns (address);
 
     function uniPool() external returns (address);
     function aavePool() external returns (address);
@@ -19,9 +21,7 @@ interface ICustodianFactory {
         address _admin,
         address _beacon,
         address _baseToken,
-        address _aBaseToken,
         address _quoteToken,
-        address _aQuoteToken,
         address _uniPool,
         address _aavePool
     ) external;
