@@ -10,7 +10,6 @@ import {IUniswapV3SwapCallback} from "./interfaces/uniswap/callback/IUniswapV3Sw
 import {IUniswapV3Pool} from "./interfaces/uniswap/IUniswapV3Pool.sol";
 import {IPool} from "./interfaces/aave/IPool.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import "forge-std/Test.sol";
 
 contract Custodian is ICustodian, Initializable, ReentrancyGuardUpgradeable, IUniswapV3SwapCallback {
     address public factory;
@@ -51,7 +50,7 @@ contract Custodian is ICustodian, Initializable, ReentrancyGuardUpgradeable, IUn
     function initialize(address _factory) external initializer {
         factory = _factory;
         isBaseZero = _baseToken() < _quoteToken() ? true : false;
-        // console.log("isBaseZero:", isBaseZero);
+
         __ReentrancyGuard_init();
     }
 
