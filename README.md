@@ -10,6 +10,10 @@ WETH/USDC
 
 # CODING IN PROGRESS~~~~~~~
 
+## Such as liquidation service, limit order, batch limit order etc~
+
+## Developed functionalities
+
 ### openLong:
 
 ##### Uniswap: quoteToken(USDC) flashswap--> baseToken(WETH)
