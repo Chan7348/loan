@@ -90,7 +90,12 @@ contract Custodian is ICustodian, Initializable, ReentrancyGuardUpgradeable, IUn
         uint amount = baseReserve();
         require(amount > 0, NotEnoughMargin(true));
 
-        IUniswapV3Pool(_uniPool()).swap(address(this), isBaseZero ? false : true, -int256(amount * (leverage - 1)), isBaseZero ? 1461446703485210103287273052203988822378723970341 : 4295128740, abi.encode(Action.OPENLONG));
+        IUniswapV3Pool(_uniPool()).swap(
+            address(this), isBaseZero ?
+            false : true, -int256(amount * (leverage - 1)),
+            isBaseZero ? 1461446703485210103287273052203988822378723970341 : 4295128740,
+            abi.encode(Action.OPENLONG)
+        );
     }
 
     // keep a few quote token as margin, then mortage in base token, and borrow more quote token
@@ -106,17 +111,28 @@ contract Custodian is ICustodian, Initializable, ReentrancyGuardUpgradeable, IUn
         uint amount = quoteReserve();
         require(amount > 0, NotEnoughMargin(false));
 
-        IUniswapV3Pool(_uniPool()).swap(address(this), isBaseZero ? true : false, -int256(amount * (leverage - 1)), isBaseZero ? 4295128740 : 1461446703485210103287273052203988822378723970341, abi.encode(Action.OPENSHORT));
+        IUniswapV3Pool(_uniPool()).swap(
+            address(this),
+            isBaseZero ? true : false,
+            -int256(amount * (leverage - 1)),
+            isBaseZero ? 4295128740 : 1461446703485210103287273052203988822378723970341,
+            abi.encode(Action.OPENSHORT)
+        );
     }
 
-    //
     function closeLong() public onlyUser nonReentrant {
         require(isLongPositionOpen && !isShortPositionOpen, CloseLongFailed());
 
         uint256 debtAmount = IERC20(_aaveDebtQuoteToken()).balanceOf(address(this));
         require(debtAmount > 0, ClosePositionFailed());
 
-        IUniswapV3Pool(_uniPool()).swap(address(this), isBaseZero ? true : false, -int256(debtAmount), isBaseZero ? 4295128740 : 1461446703485210103287273052203988822378723970341, abi.encode(Action.CLOSELONG));
+        IUniswapV3Pool(_uniPool()).swap(
+            address(this),
+            isBaseZero ? true : false,
+            -int256(debtAmount),
+            isBaseZero ? 4295128740 : 1461446703485210103287273052203988822378723970341,
+            abi.encode(Action.CLOSELONG)
+        );
     }
 
     function closeShort() public onlyUser nonReentrant {
@@ -125,7 +141,13 @@ contract Custodian is ICustodian, Initializable, ReentrancyGuardUpgradeable, IUn
         uint256 debtAmount = IERC20(_aaveDebtBaseToken()).balanceOf(address(this));
         require(debtAmount > 0, ClosePositionFailed());
 
-        IUniswapV3Pool(_uniPool()).swap(address(this), isBaseZero ? false : true, -int256(debtAmount), isBaseZero ? 1461446703485210103287273052203988822378723970341 : 4295128740, abi.encode(Action.CLOSESHORT));
+        IUniswapV3Pool(_uniPool()).swap(
+            address(this),
+            isBaseZero ? false : true,
+            -int256(debtAmount),
+            isBaseZero ? 1461446703485210103287273052203988822378723970341 : 4295128740,
+            abi.encode(Action.CLOSESHORT)
+        );
     }
 
     function uniswapV3SwapCallback(int256 amount0Delta, int256 amount1Delta, bytes calldata data) external {
@@ -165,22 +187,6 @@ contract Custodian is ICustodian, Initializable, ReentrancyGuardUpgradeable, IUn
         }
     }
 
-    function _baseToken() private returns (address) { return ICustodianFactory(factory).baseToken(); }
-
-    function _aaveBaseToken() private returns (address) { return ICustodianFactory(factory).aaveBaseToken(); }
-
-    function _aaveDebtBaseToken() private returns (address) { return ICustodianFactory(factory).aaveDebtBaseToken(); }
-
-    function _quoteToken() private returns (address) { return ICustodianFactory(factory).quoteToken(); }
-
-    function _aaveQuoteToken() private returns (address) { return ICustodianFactory(factory).aaveQuoteToken(); }
-
-    function _aaveDebtQuoteToken() private returns (address) { return ICustodianFactory(factory).aaveDebtQuoteToken(); }
-
-    function _uniPool() private returns (address) { return ICustodianFactory(factory).uniPool(); }
-
-    function _aavePool() private returns (address) { return ICustodianFactory(factory).aavePool(); }
-
     function _openCallback(address supplyToken, address borrowToken, uint256 supplyAmount, uint256 borrowAmount) private {
         IERC20(supplyToken).approve(_aavePool(), supplyAmount);
         IPool(_aavePool()).supply(supplyToken, supplyAmount, address(this), 0);
@@ -203,4 +209,20 @@ contract Custodian is ICustodian, Initializable, ReentrancyGuardUpgradeable, IUn
         // repay to Uniswap
         IERC20(withdrawToken).transfer(msg.sender, amountToUniswap);
     }
+
+    function _baseToken() private returns (address) { return ICustodianFactory(factory).baseToken(); }
+
+    function _aaveBaseToken() private returns (address) { return ICustodianFactory(factory).aaveBaseToken(); }
+
+    function _aaveDebtBaseToken() private returns (address) { return ICustodianFactory(factory).aaveDebtBaseToken(); }
+
+    function _quoteToken() private returns (address) { return ICustodianFactory(factory).quoteToken(); }
+
+    function _aaveQuoteToken() private returns (address) { return ICustodianFactory(factory).aaveQuoteToken(); }
+
+    function _aaveDebtQuoteToken() private returns (address) { return ICustodianFactory(factory).aaveDebtQuoteToken(); }
+
+    function _uniPool() private returns (address) { return ICustodianFactory(factory).uniPool(); }
+
+    function _aavePool() private returns (address) { return ICustodianFactory(factory).aavePool(); }
 }
