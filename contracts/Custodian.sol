@@ -131,106 +131,76 @@ contract Custodian is ICustodian, Initializable, ReentrancyGuardUpgradeable, IUn
     function uniswapV3SwapCallback(int256 amount0Delta, int256 amount1Delta, bytes calldata data) external {
         Action action = abi.decode(data, (Action));
         if (action == Action.OPENLONG) {
-            // WETH amount we got
-            // uint256 baseOutAmount = uint256(isBaseZero ? -amount0Delta : -amount1Delta);
-
-            // USDC we need to repay to Uniswap
             uint256 quoteInAmount = uint256(isBaseZero ? amount1Delta : amount0Delta);
-
             uint256 baseAmount = baseReserve();
-            IERC20(_baseToken()).approve(_aavePool(), baseAmount);
-            IPool(_aavePool()).supply(_baseToken(), baseAmount, address(this), 0);
-            IPool(_aavePool()).borrow(_quoteToken(), quoteInAmount, 2, 0, address(this));
 
-            // repay to Uniswap
-            IERC20(_quoteToken()).transfer(msg.sender, quoteInAmount);
+            _openCallback(_baseToken(), _quoteToken(), baseAmount, quoteInAmount);
 
             isLongPositionOpen = true;
             emit OpenLong(baseAmount, quoteInAmount);
         } else if (action == Action.OPENSHORT) {
-            // WETH we need to repay to Uniswap
             uint256 baseInAmount = uint256(isBaseZero ? amount0Delta : amount1Delta);
-
             uint256 quoteAmount = quoteReserve();
-            IERC20(_quoteToken()).approve(_aavePool(), quoteAmount);
-            IPool(_aavePool()).supply(_quoteToken(), quoteAmount, address(this), 0);
-            IPool(_aavePool()).borrow(_baseToken(), baseInAmount, 2, 0, address(this));
 
-            // repay to Uniswap
-            IERC20(_baseToken()).transfer(msg.sender, baseInAmount);
+            _openCallback(_quoteToken(), _baseToken(), quoteAmount, baseInAmount);
 
             isShortPositionOpen = true;
             emit OpenShort(quoteAmount, baseInAmount);
         } else if (action == Action.CLOSELONG) {
-            // WETH amount we need to repay to Uniswap
+            // amount we need to repay to Uniswap
             uint256 baseInAmount = uint256(isBaseZero ? amount0Delta : amount1Delta);
 
-            // 还款USDC给aave
-            uint256 quoteDebtAmount = IERC20(_aaveDebtQuoteToken()).balanceOf(address(this));
-            IERC20(_quoteToken()).approve(_aavePool(), quoteDebtAmount);
-            IPool(_aavePool()).repay(_quoteToken(), quoteDebtAmount, 2, address(this));
-
-            // 取出所有的WETH
-            uint256 baseOverall = IERC20(_aaveBaseToken()).balanceOf(address(this));
-            IERC20(_aaveBaseToken()).approve(_aavePool(), baseOverall);
-            IPool(_aavePool()).withdraw(_baseToken(), baseOverall, address(this));
-
-            // repay to Uniswap
-            IERC20(_baseToken()).transfer(msg.sender, baseInAmount);
+            _closeCallback(_quoteToken(), _aaveDebtQuoteToken(), _baseToken(), _aaveBaseToken(), baseInAmount);
 
             isLongPositionOpen = false;
             emit CloseLong();
         } else if (action == Action.CLOSESHORT) {
-            // USDC amount wee need to repay to Uniswap
+            // amount wee need to repay to Uniswap
             uint256 quoteInAmount = uint256(isBaseZero ? amount1Delta : amount0Delta);
 
-            // 还款WETH给aave
-            uint256 baseDebtAmount = IERC20(_aaveDebtBaseToken()).balanceOf(address(this));
-            IERC20(_baseToken()).approve(_aavePool(), baseDebtAmount);
-            IPool(_aavePool()).repay(_baseToken(), baseDebtAmount, 2, address(this));
-
-            // 取出所有的USDC
-            uint256 quoteOverall = IERC20(_aaveQuoteToken()).balanceOf(address(this));
-            IERC20(_aaveQuoteToken()).approve(_aavePool(), quoteOverall);
-            IPool(_aavePool()).withdraw(_quoteToken(), quoteOverall, address(this));
-
-            // repay to Uniswap
-            IERC20(_quoteToken()).transfer(msg.sender, quoteInAmount);
+            _closeCallback(_baseToken(), _aaveDebtBaseToken(), _quoteToken(), _aaveQuoteToken(), quoteInAmount);
 
             isShortPositionOpen = false;
             emit CloseShort();
         }
     }
 
-    function _baseToken() private returns (address) {
-        return ICustodianFactory(factory).baseToken();
+    function _baseToken() private returns (address) { return ICustodianFactory(factory).baseToken(); }
+
+    function _aaveBaseToken() private returns (address) { return ICustodianFactory(factory).aaveBaseToken(); }
+
+    function _aaveDebtBaseToken() private returns (address) { return ICustodianFactory(factory).aaveDebtBaseToken(); }
+
+    function _quoteToken() private returns (address) { return ICustodianFactory(factory).quoteToken(); }
+
+    function _aaveQuoteToken() private returns (address) { return ICustodianFactory(factory).aaveQuoteToken(); }
+
+    function _aaveDebtQuoteToken() private returns (address) { return ICustodianFactory(factory).aaveDebtQuoteToken(); }
+
+    function _uniPool() private returns (address) { return ICustodianFactory(factory).uniPool(); }
+
+    function _aavePool() private returns (address) { return ICustodianFactory(factory).aavePool(); }
+
+    function _openCallback(address supplyToken, address borrowToken, uint256 supplyAmount, uint256 borrowAmount) private {
+        IERC20(supplyToken).approve(_aavePool(), supplyAmount);
+        IPool(_aavePool()).supply(supplyToken, supplyAmount, address(this), 0);
+
+        IPool(_aavePool()).borrow(borrowToken, borrowAmount, 2, 0, address(this));
+
+        // repay to Uniswap
+        IERC20(borrowToken).transfer(msg.sender, borrowAmount);
     }
 
-    function _aaveBaseToken() private returns (address) {
-        return ICustodianFactory(factory).aaveBaseToken();
-    }
+    function _closeCallback(address payToken, address payDebtToken, address withdrawToken, address withdrawAToken, uint256 amountToUniswap) private {
+        uint debtAmount = IERC20(payDebtToken).balanceOf(address(this));
+        IERC20(payToken).approve(_aavePool(), debtAmount);
+        IPool(_aavePool()).repay(payToken, debtAmount, 2, address(this));
 
-    function _aaveDebtBaseToken() private returns (address) {
-        return ICustodianFactory(factory).aaveDebtBaseToken();
-    }
+        uint256 withdrawOverall = IERC20(withdrawAToken).balanceOf(address(this));
+        IERC20(withdrawAToken).approve(_aavePool(), withdrawOverall);
+        IPool(_aavePool()).withdraw(withdrawToken, withdrawOverall, address(this));
 
-    function _quoteToken() private returns (address) {
-        return ICustodianFactory(factory).quoteToken();
-    }
-
-    function _aaveQuoteToken() private returns (address) {
-        return ICustodianFactory(factory).aaveQuoteToken();
-    }
-
-    function _aaveDebtQuoteToken() private returns (address) {
-        return ICustodianFactory(factory).aaveDebtQuoteToken();
-    }
-
-    function _uniPool() private returns (address) {
-        return ICustodianFactory(factory).uniPool();
-    }
-
-    function _aavePool() private returns (address) {
-        return ICustodianFactory(factory).aavePool();
+        // repay to Uniswap
+        IERC20(withdrawToken).transfer(msg.sender, amountToUniswap);
     }
 }
