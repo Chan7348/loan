@@ -19,6 +19,7 @@ ignition/deployments/chain-31337
 # Foundry files
 /cache_forge
 /out
+/broadcast
 
 /bin
 .DS_Store
