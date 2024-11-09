@@ -66,7 +66,7 @@ contract CustodianFactory is ICustodianFactory, Initializable, AccessControlUpgr
         emit Register(user);
     }
 
-    function _parseReserveData(address token) private returns (address aaveToken, address aaveDebtToken){
+    function _parseReserveData(address token) private view returns (address aaveToken, address aaveDebtToken){
             DataTypes.ReserveDataLegacy memory data = IPool(aavePool).getReserveData(token);
             aaveToken = data.aTokenAddress;
             aaveDebtToken = data.variableDebtTokenAddress;

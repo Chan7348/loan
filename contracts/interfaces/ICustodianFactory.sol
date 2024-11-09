@@ -2,20 +2,20 @@
 pragma solidity 0.8.27;
 
 interface ICustodianFactory {
-    function UserToAccount(address user) external returns (address account);
-    function AccountToUser(address Account) external returns (address user);
-    function beacon() external returns (address);
+    function UserToAccount(address user) external view returns (address account);
+    function AccountToUser(address Account) external view returns (address user);
+    function beacon() external view returns (address);
 
-    function baseToken() external returns (address);
-    function aaveBaseToken() external returns (address);
-    function aaveDebtBaseToken() external returns (address);
+    function baseToken() external view returns (address);
+    function aaveBaseToken() external view returns (address);
+    function aaveDebtBaseToken() external view returns (address);
 
-    function quoteToken() external returns (address);
-    function aaveQuoteToken() external returns (address);
-    function aaveDebtQuoteToken() external returns (address);
+    function quoteToken() external view returns (address);
+    function aaveQuoteToken() external view returns (address);
+    function aaveDebtQuoteToken() external view returns (address);
 
-    function uniPool() external returns (address);
-    function aavePool() external returns (address);
+    function uniPool() external view returns (address);
+    function aavePool() external view returns (address);
 
     function initialize(
         address _admin,

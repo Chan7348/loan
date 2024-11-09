@@ -54,11 +54,11 @@ contract Custodian is ICustodian, Initializable, ReentrancyGuardUpgradeable, IUn
         __ReentrancyGuard_init();
     }
 
-    function baseReserve() public returns (uint256) {
+    function baseReserve() public view returns (uint256) {
         return IERC20(_baseToken()).balanceOf(address(this));
     }
 
-    function quoteReserve() public returns (uint256) {
+    function quoteReserve() public view returns (uint256) {
         return IERC20(_quoteToken()).balanceOf(address(this));
     }
 
@@ -210,19 +210,19 @@ contract Custodian is ICustodian, Initializable, ReentrancyGuardUpgradeable, IUn
         IERC20(withdrawToken).transfer(msg.sender, amountToUniswap);
     }
 
-    function _baseToken() private returns (address) { return ICustodianFactory(factory).baseToken(); }
+    function _baseToken() private view returns (address) { return ICustodianFactory(factory).baseToken(); }
 
-    function _aaveBaseToken() private returns (address) { return ICustodianFactory(factory).aaveBaseToken(); }
+    function _aaveBaseToken() private view returns (address) { return ICustodianFactory(factory).aaveBaseToken(); }
 
-    function _aaveDebtBaseToken() private returns (address) { return ICustodianFactory(factory).aaveDebtBaseToken(); }
+    function _aaveDebtBaseToken() private view returns (address) { return ICustodianFactory(factory).aaveDebtBaseToken(); }
 
-    function _quoteToken() private returns (address) { return ICustodianFactory(factory).quoteToken(); }
+    function _quoteToken() private view returns (address) { return ICustodianFactory(factory).quoteToken(); }
 
-    function _aaveQuoteToken() private returns (address) { return ICustodianFactory(factory).aaveQuoteToken(); }
+    function _aaveQuoteToken() private view returns (address) { return ICustodianFactory(factory).aaveQuoteToken(); }
 
-    function _aaveDebtQuoteToken() private returns (address) { return ICustodianFactory(factory).aaveDebtQuoteToken(); }
+    function _aaveDebtQuoteToken() private view returns (address) { return ICustodianFactory(factory).aaveDebtQuoteToken(); }
 
-    function _uniPool() private returns (address) { return ICustodianFactory(factory).uniPool(); }
+    function _uniPool() private view returns (address) { return ICustodianFactory(factory).uniPool(); }
 
-    function _aavePool() private returns (address) { return ICustodianFactory(factory).aavePool(); }
+    function _aavePool() private view returns (address) { return ICustodianFactory(factory).aavePool(); }
 }
