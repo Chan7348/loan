@@ -10,5 +10,5 @@
         "editor.defaultFormatter": "JuanBlanco.solidity"
     },
     "solidity.formatter": "forge",
-    "solidity.defaultCompiler": "localFile",
+    "solidity.defaultCompiler": "remote",
 }

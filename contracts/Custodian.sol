@@ -85,17 +85,7 @@ contract Custodian is ICustodian, Initializable, ReentrancyGuardUpgradeable, IUn
     // repay minimum USDC to Uniswap
     // Finally, we have more WETH in collateral.
     function openLong(uint256 leverage) public onlyUser nonReentrant {
-        require(!isLongPositionOpen && !isShortPositionOpen, OpenLongFailed());
-
-        uint amount = baseReserve();
-        require(amount > 0, NotEnoughMargin(true));
-
-        IUniswapV3Pool(_uniPool()).swap(
-            address(this), isBaseZero ?
-            false : true, -int256(amount * (leverage - 1)),
-            isBaseZero ? 1461446703485210103287273052203988822378723970341 : 4295128740,
-            abi.encode(Action.OPENLONG)
-        );
+        _openLong(leverage);
     }
 
     // keep a few quote token as margin, then mortage in base token, and borrow more quote token
@@ -106,48 +96,15 @@ contract Custodian is ICustodian, Initializable, ReentrancyGuardUpgradeable, IUn
     // repay minimum WETH to Uniswap
     // Finally, we have more USDC in collateral.
     function openShort(uint256 leverage) public onlyUser nonReentrant {
-        require(!isLongPositionOpen && !isShortPositionOpen, OpenShortFailed());
-
-        uint amount = quoteReserve();
-        require(amount > 0, NotEnoughMargin(false));
-
-        IUniswapV3Pool(_uniPool()).swap(
-            address(this),
-            isBaseZero ? true : false,
-            -int256(amount * (leverage - 1)),
-            isBaseZero ? 4295128740 : 1461446703485210103287273052203988822378723970341,
-            abi.encode(Action.OPENSHORT)
-        );
+        _openShort(leverage);
     }
 
     function closeLong() public onlyUser nonReentrant {
-        require(isLongPositionOpen && !isShortPositionOpen, CloseLongFailed());
-
-        uint256 debtAmount = IERC20(_aaveDebtQuoteToken()).balanceOf(address(this));
-        require(debtAmount > 0, ClosePositionFailed());
-
-        IUniswapV3Pool(_uniPool()).swap(
-            address(this),
-            isBaseZero ? true : false,
-            -int256(debtAmount),
-            isBaseZero ? 4295128740 : 1461446703485210103287273052203988822378723970341,
-            abi.encode(Action.CLOSELONG)
-        );
+        _closeLong();
     }
 
     function closeShort() public onlyUser nonReentrant {
-        require(!isLongPositionOpen && isShortPositionOpen, CloseShortFailed());
-
-        uint256 debtAmount = IERC20(_aaveDebtBaseToken()).balanceOf(address(this));
-        require(debtAmount > 0, ClosePositionFailed());
-
-        IUniswapV3Pool(_uniPool()).swap(
-            address(this),
-            isBaseZero ? false : true,
-            -int256(debtAmount),
-            isBaseZero ? 1461446703485210103287273052203988822378723970341 : 4295128740,
-            abi.encode(Action.CLOSESHORT)
-        );
+        _closeShort();
     }
 
     function uniswapV3SwapCallback(int256 amount0Delta, int256 amount1Delta, bytes calldata data) external {
@@ -185,6 +142,65 @@ contract Custodian is ICustodian, Initializable, ReentrancyGuardUpgradeable, IUn
             isShortPositionOpen = false;
             emit CloseShort();
         }
+    }
+
+    function _openLong(uint256 leverage) internal {
+        require(!isLongPositionOpen && !isShortPositionOpen, OpenLongFailed());
+
+        uint amount = baseReserve();
+        require(amount > 0, NotEnoughMargin(true));
+
+        IUniswapV3Pool(_uniPool()).swap(
+            address(this), isBaseZero ?
+            false : true, -int256(amount * (leverage - 1)),
+            isBaseZero ? 1461446703485210103287273052203988822378723970341 : 4295128740,
+            abi.encode(Action.OPENLONG)
+        );
+    }
+
+    function _openShort(uint256 leverage) internal {
+        require(!isLongPositionOpen && !isShortPositionOpen, OpenShortFailed());
+
+        uint amount = quoteReserve();
+        require(amount > 0, NotEnoughMargin(false));
+
+        IUniswapV3Pool(_uniPool()).swap(
+            address(this),
+            isBaseZero ? true : false,
+            -int256(amount * (leverage - 1)),
+            isBaseZero ? 4295128740 : 1461446703485210103287273052203988822378723970341,
+            abi.encode(Action.OPENSHORT)
+        );
+    }
+
+    function _closeLong() internal {
+        require(isLongPositionOpen && !isShortPositionOpen, CloseLongFailed());
+
+        uint256 debtAmount = IERC20(_aaveDebtQuoteToken()).balanceOf(address(this));
+        require(debtAmount > 0, ClosePositionFailed());
+
+        IUniswapV3Pool(_uniPool()).swap(
+            address(this),
+            isBaseZero ? true : false,
+            -int256(debtAmount),
+            isBaseZero ? 4295128740 : 1461446703485210103287273052203988822378723970341,
+            abi.encode(Action.CLOSELONG)
+        );
+    }
+
+    function _closeShort() internal {
+        require(!isLongPositionOpen && isShortPositionOpen, CloseShortFailed());
+
+        uint256 debtAmount = IERC20(_aaveDebtBaseToken()).balanceOf(address(this));
+        require(debtAmount > 0, ClosePositionFailed());
+
+        IUniswapV3Pool(_uniPool()).swap(
+            address(this),
+            isBaseZero ? false : true,
+            -int256(debtAmount),
+            isBaseZero ? 1461446703485210103287273052203988822378723970341 : 4295128740,
+            abi.encode(Action.CLOSESHORT)
+        );
     }
 
     function _openCallback(address supplyToken, address borrowToken, uint256 supplyAmount, uint256 borrowAmount) private {
